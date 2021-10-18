@@ -1,74 +1,61 @@
 import os
-import numpy as np
-from sklearn.svm import LinearSVC
+import json
+import argparse
 
+from sklearn.svm import LinearSVC
+from data import CaltechDataLoader
 from spm import SpatialPyramidMatching
 
-
-def split_category_train_test(X, category, n_train=30, max_n_test=50):
-    if len(X) < n_train:
-        raise Exception("Number of images for category '{}' < n_train".format(category))
-    np.random.seed(0)
-    idx = np.arange(len(X))
-    np.random.shuffle(idx)
-
-    train_idx = idx[:n_train]
-    test_idx = idx[n_train:n_train + max_n_test]
-    X = np.array(X)
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train = np.array([category] * len(X_train))
-    y_test = np.array([category] * len(X_test))
-    return X_train, X_test, y_train, y_test
-
-
-def load_data(data_dir: str):
-    categories = os.listdir(data_dir)
-    X_train, X_test = [], []
-    y_train, y_test = [], []
-    for cat in categories:
-        files = os.listdir(os.path.join(data_dir, cat))
-        X_cat = [os.path.join(data_dir, cat, file) for file in files]
-        X_train_cat, X_test_cat, y_train_cat, y_test_cat = split_category_train_test(X_cat, cat)
-        X_train.append(X_train_cat)
-        X_test.append(X_test_cat)
-        y_train.append(y_train_cat)
-        y_test.append(y_test_cat)
-    X_train = np.concatenate(X_train)
-    X_test = np.concatenate(X_test)
-    y_train = np.concatenate(y_train)
-    y_test = np.concatenate(y_test)
-
-    all_cat, train_counts = np.unique(y_train, return_counts=True)
-    all_cat2, test_counts = np.unique(y_test, return_counts=True)
-    assert(np.all(all_cat == all_cat2))
-
-    n = len(max(all_cat, key=len))
-    print("Category Counts")
-    print("===============")
-    for cat, train_count, test_count in zip(all_cat, train_counts, test_counts):
-        print("{}:\ttrain: {}\ttest: {}".format(
-            cat + " " * (n - len(cat)), train_count, test_count
-        ))
-    print()
-    return X_train, X_test, y_train, y_test
-
+N_TRAIN = 30
+N_TEST = 50
+N_SEED = 10
+N_LEVEL = 4
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data', type=str, default='./data')
+    parser.add_argument('--output', type=str, default='./')
+    args = parser.parse_args()
 
-    data_dir = "data"
-    X_train, X_test, y_train, y_test = load_data(data_dir)
+    data_dir = args.data
+    dataloader = CaltechDataLoader(n_train=N_TRAIN, max_n_test=N_TEST)
+    X, y = dataloader.load_data(data_dir)
 
-    print("Fit Spatial Pyramid Matching")
     SPM = SpatialPyramidMatching(n_jobs=-1)
-    SPM.fit(X_train)
-    print()
+    descriptions, coordinates = SPM.extract_sift_features(X)
 
-    for L in range(4):
-        print("Train LinearSVC (L = {})".format(L))
-        X_train_spm = SPM.transform(X_train, L=L)
-        model = LinearSVC(random_state=0)
-        model.fit(X_train_spm, y_train)
+    results = list()
 
-        X_test_spm = SPM.transform(X_test, L=L)
-        accuracy = model.score(X_test_spm, y_test)
-        print("Level {}:\t Accuracy: {}\n".format(L, accuracy))
+    for seed in range(N_SEED):
+        print("\nSeed: {}".format(seed))
+        train_idx, test_idx = dataloader.split_category_train_test(y, seed)
+
+        train_descriptions = descriptions[train_idx]
+        test_descriptions = descriptions[test_idx]
+        train_coordinates = coordinates[train_idx]
+        test_coordinates = coordinates[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        print("Fit Spatial Pyramid Matching")
+        SPM.fit(train_descriptions)
+
+        for L in range(N_LEVEL):
+            print("Train LinearSVC (L = {})".format(L))
+            X_train = SPM.transform(train_descriptions, train_coordinates, L=L)
+            model = LinearSVC(random_state=0)
+            model.fit(X_train, y_train)
+
+            X_test = SPM.transform(test_descriptions, test_coordinates, L=L)
+            accuracy = model.score(X_test, y_test)
+            results.append({
+                "seed": seed,
+                "level": L,
+                "accuracy": accuracy
+            })
+            print("Level {}:\t Accuracy: {}".format(L, accuracy))
+
+    out_dir = args.output
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    with open(os.path.join(out_dir, "results.json"), "w") as f:
+        json.dump({"results": results}, f)
