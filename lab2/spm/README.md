@@ -12,6 +12,15 @@
 conda install --file requirements.txt -c conda-forge
 ```
 
+## Run
+
+```shell
+python run.py --data <path_to_data_folder> --output <path_to_output_folder>
+```
+Default parameters:
+- ``data``: ``"./data"``
+- ``output``: ``"./"``
+
 
 ## References
 
