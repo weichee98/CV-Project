@@ -97,5 +97,5 @@ class AdaptiveMeanThresholding(_BaseThresholding):
     @classmethod
     def threshold(cls, img, C=0, ksize=5, **kwargs):
         mean = cv2.blur(img, ksize=(ksize, ksize))
-        t = mean.astype(int) - C
+        t = np.where(mean > C, mean - C, 0).astype(np.uint8)
         return t

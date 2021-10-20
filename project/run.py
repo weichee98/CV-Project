@@ -42,15 +42,18 @@ def plot_text(img, text, dist=None, font_size=0.6):
     return text_im
 
 
-def plot_sample01(img, text, dist, output_path):
+def plot_sample(img, text, dist, output_path, thresh_map=None, concat="vertical"):
     text_im = plot_text(img, text, dist, font_size=0.5)
-    out_im = cv2.vconcat([img, text_im])
-    save_image(out_im, output_path)
-
-
-def plot_sample02(img, text, dist, output_path):
-    text_im = plot_text(img, text, dist, font_size=0.6)
-    out_im = cv2.hconcat([img, text_im])
+    if thresh_map is None:
+        images = [img, text_im]
+    else:
+        images = [thresh_map, img, text_im]
+    if concat == "vertical":
+        out_im = cv2.vconcat(images)
+    elif concat == "horizontal":
+        out_im = cv2.hconcat(images)
+    else:
+        raise NotImplementedError("invalid concat option: {}".format(concat))
     save_image(out_im, output_path)
 
 
@@ -65,18 +68,30 @@ def sample01(data_dir, output_dir):
 
     # Original Image
     text, dist = ocr(img, ref)
-    plot_sample01(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)))
+    plot_sample(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)), concat="vertical")
 
     # OTSU
+    otsu_map = OTSU.threshold(img)
     otsu = OTSU.binarize(img)
     text, dist = ocr(otsu, ref)
-    plot_sample01(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)))
+    plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
+                thresh_map=otsu_map, concat="vertical")
 
     # Adaptive Mean Thresholding
-    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=5, C=2)
+    mean_map = AdaptiveMeanThresholding.threshold(img, kernel_size=3, C=2)
+    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=2)
     mean = cv2.medianBlur(mean, 3)
     text, dist = ocr(mean, ref)
-    plot_sample01(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)))
+    plot_sample(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)),
+                thresh_map=mean_map, concat="vertical")
+
+    # Gaussian Blurring + Adaptive Mean Thresholding
+    gauss = cv2.GaussianBlur(img, (5, 5), sigmaX=1., sigmaY=1.)
+    gauss_map = AdaptiveMeanThresholding.threshold(gauss, kernel_size=3, C=2)
+    gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=2)
+    text, dist = ocr(gauss, ref)
+    plot_sample(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)),
+                thresh_map=gauss_map, concat="vertical")
 
 
 def sample02(data_dir, output_dir):
@@ -90,24 +105,30 @@ def sample02(data_dir, output_dir):
 
     # Original Image
     text, dist = ocr(img, ref)
-    plot_sample02(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)))
+    plot_sample(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)), concat="horizontal")
 
     # OTSU
+    otsu_map = OTSU.threshold(img)
     otsu = OTSU.binarize(img)
     text, dist = ocr(otsu, ref)
-    plot_sample02(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)))
+    plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
+                thresh_map=otsu_map, concat="horizontal")
 
     # Adaptive Mean Thresholding
-    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=5, C=1)
+    mean_map = AdaptiveMeanThresholding.threshold(img, kernel_size=3, C=1)
+    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=1)
     mean = cv2.medianBlur(mean, 3)
     text, dist = ocr(mean, ref)
-    plot_sample02(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)))
+    plot_sample(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)),
+                thresh_map=mean_map, concat="horizontal")
 
     # Gaussian Blurring + Adaptive Mean Thresholding
-    gauss = cv2.GaussianBlur(img, (3, 3), 1.)
-    gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=5, C=1)
+    gauss = cv2.GaussianBlur(img, (5, 5), sigmaX=1., sigmaY=1.)
+    gauss_map = AdaptiveMeanThresholding.threshold(gauss, kernel_size=3, C=1)
+    gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=1)
     text, dist = ocr(gauss, ref)
-    plot_sample02(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)))
+    plot_sample(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)),
+                thresh_map=gauss_map, concat="horizontal")
 
 
 if __name__ == "__main__":
