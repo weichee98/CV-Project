@@ -99,15 +99,3 @@ class AdaptiveMeanThresholding(_BaseThresholding):
         mean = cv2.blur(img, ksize=(ksize, ksize))
         t = mean.astype(int) - C
         return t
-
-
-class GrabCutBinarization:
-
-    @classmethod
-    def binarize(cls, img, **kwargs):
-        edge = cv2.Canny(img, 10, 100)
-        mask = np.where(edge > 0, cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype(np.uint8)
-        fg, bg = np.zeros((1, 65), dtype=float), np.zeros((1, 65), dtype=float)
-        segmentation, _, _ = cv2.grabCut(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR), mask, None, fg, bg, 1)
-        new_img = np.where((segmentation == cv2.GC_FGD) | (segmentation == cv2.GC_PR_FGD), 0, 255)
-        return new_img.astype(np.uint8)

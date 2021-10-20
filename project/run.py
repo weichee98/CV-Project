@@ -6,7 +6,7 @@ import argparse
 import numpy as np
 import pytesseract
 from Levenshtein import ratio
-from otsu import OTSU, AdaptiveMeanThresholding, GrabCutBinarization
+from otsu import OTSU, AdaptiveMeanThresholding
 from utils import read_image, save_image
 
 
@@ -108,11 +108,6 @@ def sample02(data_dir, output_dir):
     gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=5, C=1)
     text, dist = ocr(gauss, ref)
     plot_sample02(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)))
-
-    # GrabCut
-    gc = GrabCutBinarization.binarize(img)
-    text, dist = ocr(gc, ref)
-    plot_sample02(gc, text, dist, os.path.join(output_dir, "{}_gc.png".format(img_name)))
 
 
 if __name__ == "__main__":
