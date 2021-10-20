@@ -1,13 +1,14 @@
+
 import cv2
 import numpy as np
 from abc import abstractmethod
 
 
-class _BaseOTSU:
+class _BaseThresholding:
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def threshold(img, **kwargs):
+    def threshold(cls, img, **kwargs):
         """
         To find the threshold used for binarization of a grayscale image
 
@@ -33,8 +34,6 @@ class _BaseOTSU:
         ----------
         img: np.array (height, width)
             The grayscale image
-        kwargs: dict
-            Keyword argument for ``threshold`` method
 
         Returns
         -------
@@ -42,17 +41,17 @@ class _BaseOTSU:
             The binarized image
 
         """
-        best_threshold = cls.threshold(img, **kwargs)
-        return np.where(img >= best_threshold, 255, 0).astype(np.uint8)
+        t = cls.threshold(img, **kwargs)
+        return np.where(img >= t, 255, 0).astype(np.uint8)
 
 
-class OTSU(_BaseOTSU):
+class OTSU(_BaseThresholding):
     """
-    Perform global thresholding
+    Perform global OTSU thresholding
     """
 
-    @staticmethod
-    def threshold(img, **kwargs):
+    @classmethod
+    def threshold(cls, img, **kwargs):
         histogram = cv2.calcHist(
             images=[img],
             channels=[0],
@@ -90,61 +89,25 @@ class OTSU(_BaseOTSU):
         return np.full_like(img, fill_value=best_threshold)
 
 
-class GridOTSU(_BaseOTSU):
+class AdaptiveMeanThresholding(_BaseThresholding):
     """
-    Split image into grids then perform thresholding on each grid
-    """
-
-    @staticmethod
-    def threshold(img, num_col=1, num_row=1, var_threshold=0, default_threshold=0,
-                  gauss_sigma=None, gauss_ksize=(5, 5)):
-        if gauss_sigma is not None:
-            img = cv2.GaussianBlur(img, ksize=gauss_ksize, sigmaX=gauss_sigma, sigmaY=gauss_sigma)
-
-        threshold_mask = np.zeros_like(img)
-        height, width = img.shape[:2]
-        rows = np.linspace(0, height, num_row + 1).astype(int)
-        cols = np.linspace(0, width, num_col + 1).astype(int)
-        global_var = np.var(img)
-
-        for r in range(num_row):
-            for c in range(num_col):
-                grid = img[rows[r]:rows[r + 1], cols[c]:cols[c + 1]]
-                if var_threshold > 0 and np.var(grid) < global_var * var_threshold:
-                    threshold_mask[rows[r]:rows[r + 1], cols[c]:cols[c + 1]] = default_threshold
-                    continue
-                t = OTSU.threshold(grid)
-                threshold_mask[rows[r]:rows[r + 1], cols[c]:cols[c + 1]] = t
-        return threshold_mask
-
-
-class SlidingOTSU(_BaseOTSU):
-    """
-    Find threshold using sliding window
+    Threshold for each pixel is the mean of its (K x K) neighbourhood
     """
 
-    @staticmethod
-    def threshold(img, kernel_size=(5, 5), stride=(1, 1), var_threshold=0, default_threshold=0,
-                  gauss_sigma=None, gauss_ksize=(5, 5)):
-        if gauss_sigma is not None:
-            img = cv2.GaussianBlur(img, ksize=gauss_ksize, sigmaX=gauss_sigma, sigmaY=gauss_sigma)
+    @classmethod
+    def threshold(cls, img, C=0, ksize=5, **kwargs):
+        mean = cv2.blur(img, ksize=(ksize, ksize))
+        t = mean.astype(int) - C
+        return t
 
-        threshold_mask = np.zeros_like(img, dtype=float)
-        num_repetition = np.zeros_like(img)
-        height, width = img.shape[:2]
-        rows = np.linspace(0, (height - kernel_size[1]), (height - kernel_size[1]) // stride[1] + 1).astype(int)
-        cols = np.linspace(0, (width - kernel_size[0]), (width - kernel_size[0]) // stride[0] + 1).astype(int)
-        global_var = np.var(img)
 
-        for r in range(len(rows)):
-            for c in range(len(cols)):
-                window = img[rows[r]:rows[r] + kernel_size[1], cols[c]:cols[c] + kernel_size[0]]
-                if var_threshold > 0 and np.var(window) < global_var * var_threshold:
-                    threshold_mask[rows[r]:rows[r] + kernel_size[1],
-                    cols[c]:cols[c] + kernel_size[0]] += default_threshold
-                else:
-                    t = OTSU.threshold(window)
-                    threshold_mask[rows[r]:rows[r] + kernel_size[1], cols[c]:cols[c] + kernel_size[0]] += t
-                num_repetition[rows[r]:rows[r] + kernel_size[1], cols[c]:cols[c] + kernel_size[0]] += 1
+class GrabCutBinarization:
 
-        return threshold_mask / num_repetition
+    @classmethod
+    def binarize(cls, img, **kwargs):
+        edge = cv2.Canny(img, 10, 100)
+        mask = np.where(edge > 0, cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype(np.uint8)
+        fg, bg = np.zeros((1, 65), dtype=float), np.zeros((1, 65), dtype=float)
+        segmentation, _, _ = cv2.grabCut(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR), mask, None, fg, bg, 1)
+        new_img = np.where((segmentation == cv2.GC_FGD) | (segmentation == cv2.GC_PR_FGD), 0, 255)
+        return new_img.astype(np.uint8)
