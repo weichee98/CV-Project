@@ -2,6 +2,8 @@
 import cv2
 import numpy as np
 from abc import abstractmethod
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
 
 
 class _BaseThresholding:
@@ -26,7 +28,7 @@ class _BaseThresholding:
         raise NotImplementedError
 
     @classmethod
-    def binarize(cls, img, **kwargs):
+    def binarize(cls, img, return_threshold=True, **kwargs):
         """
         To binarize a grayscale image
 
@@ -34,6 +36,8 @@ class _BaseThresholding:
         ----------
         img: np.array (height, width)
             The grayscale image
+        return_threshold: bool
+            Whether or not to return threshold map
 
         Returns
         -------
@@ -42,7 +46,10 @@ class _BaseThresholding:
 
         """
         t = cls.threshold(img, **kwargs)
-        return np.where(img >= t, 255, 0).astype(np.uint8)
+        b = np.where(img >= t, 255, 0).astype(np.uint8)
+        if return_threshold:
+            return b, t
+        return b
 
 
 class OTSU(_BaseThresholding):
@@ -99,3 +106,42 @@ class AdaptiveMeanThresholding(_BaseThresholding):
         mean = cv2.blur(img, ksize=(ksize, ksize))
         t = np.where(mean > C, mean - C, 0).astype(np.uint8)
         return t
+
+
+class RegressionThresholding(_BaseThresholding):
+    """
+    Thresholding using regression models
+    """
+
+    @classmethod
+    def threshold(cls, img, rgr_model=LinearRegression(), C=0, downsample=None, **kwargs):
+        if downsample is None or downsample <= 1:
+            _height, _width = img.shape[0], img.shape[1]
+            _img = img
+        else:
+            downsample = float(downsample)
+            _width, _height = int(img.shape[1] / downsample), int(img.shape[0] / downsample)
+            _img = cv2.resize(img, (_width, _height))
+
+        x = np.repeat(np.expand_dims(np.arange(_width), axis=0), _height, axis=0)
+        y = np.repeat(np.expand_dims(np.arange(_height), axis=1), _width, axis=1)
+        data = np.stack([x, y, _img], axis=2).reshape((-1, 3))
+        s = StandardScaler()
+        data = s.fit_transform(data)
+        X = data[:, [0, 1]]
+        y = data[:, 2]
+
+        rgr_model.fit(X, y)
+        pred = rgr_model.predict(X) - C
+        inv_pred = s.inverse_transform(np.stack([X[:, 0], X[:, 1], pred], axis=1))
+        threshold = np.clip(inv_pred[:, 2], 0, 255)
+        threshold = threshold.reshape(_img.shape).astype(np.uint8)
+
+        if downsample is None or downsample <= 1:
+            return threshold
+        threshold = cv2.resize(threshold, (img.shape[1], img.shape[0]))
+        return threshold
+
+
+
+

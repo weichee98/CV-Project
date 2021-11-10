@@ -1,4 +1,5 @@
 opencv
 tesseract
 pytesseract
+scikit-learn
 python-levenshtein

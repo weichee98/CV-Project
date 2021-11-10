@@ -2,11 +2,12 @@ import os
 import re
 import cv2
 import argparse
-
 import numpy as np
 import pytesseract
 from Levenshtein import ratio
-from otsu import OTSU, AdaptiveMeanThresholding
+from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
+from otsu import OTSU, AdaptiveMeanThresholding, RegressionThresholding
 from utils import read_image, save_image
 
 
@@ -71,15 +72,13 @@ def sample01(data_dir, output_dir):
     plot_sample(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)), concat="vertical")
 
     # OTSU
-    otsu_map = OTSU.threshold(img)
-    otsu = OTSU.binarize(img)
+    otsu, otsu_map = OTSU.binarize(img)
     text, dist = ocr(otsu, ref)
     plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
                 thresh_map=otsu_map, concat="vertical")
 
     # Adaptive Mean Thresholding
-    mean_map = AdaptiveMeanThresholding.threshold(img, kernel_size=3, C=2)
-    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=2)
+    mean, mean_map = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=2)
     mean = cv2.medianBlur(mean, 3)
     text, dist = ocr(mean, ref)
     plot_sample(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)),
@@ -87,11 +86,38 @@ def sample01(data_dir, output_dir):
 
     # Gaussian Blurring + Adaptive Mean Thresholding
     gauss = cv2.GaussianBlur(img, (5, 5), sigmaX=1., sigmaY=1.)
-    gauss_map = AdaptiveMeanThresholding.threshold(gauss, kernel_size=3, C=2)
-    gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=2)
+    gauss, gauss_map = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=2)
     text, dist = ocr(gauss, ref)
     plot_sample(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)),
                 thresh_map=gauss_map, concat="vertical")
+
+    # Linear Regression
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear.png".format(img_name)),
+                thresh_map=linear_map, concat="vertical")
+
+    # Linear Regression + Downsample
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear_downsample.png".format(img_name)),
+                thresh_map=linear_map, concat="vertical")
+
+    # MLP Regressor
+    model = MLPRegressor(hidden_layer_sizes=(5, 5), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp.png".format(img_name)),
+                thresh_map=mlp_map, concat="vertical")
+
+    # MLP Regressor + Downsample
+    model = MLPRegressor(hidden_layer_sizes=(5, 5), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp_downsample.png".format(img_name)),
+                thresh_map=mlp_map, concat="vertical")
 
 
 def sample02(data_dir, output_dir):
@@ -108,15 +134,13 @@ def sample02(data_dir, output_dir):
     plot_sample(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)), concat="horizontal")
 
     # OTSU
-    otsu_map = OTSU.threshold(img)
-    otsu = OTSU.binarize(img)
+    otsu, otsu_map = OTSU.binarize(img)
     text, dist = ocr(otsu, ref)
     plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
                 thresh_map=otsu_map, concat="horizontal")
 
     # Adaptive Mean Thresholding
-    mean_map = AdaptiveMeanThresholding.threshold(img, kernel_size=3, C=1)
-    mean = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=1)
+    mean, mean_map = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=1)
     mean = cv2.medianBlur(mean, 3)
     text, dist = ocr(mean, ref)
     plot_sample(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)),
@@ -124,11 +148,38 @@ def sample02(data_dir, output_dir):
 
     # Gaussian Blurring + Adaptive Mean Thresholding
     gauss = cv2.GaussianBlur(img, (5, 5), sigmaX=1., sigmaY=1.)
-    gauss_map = AdaptiveMeanThresholding.threshold(gauss, kernel_size=3, C=1)
-    gauss = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=1)
+    gauss, gauss_map = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=1)
     text, dist = ocr(gauss, ref)
     plot_sample(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)),
                 thresh_map=gauss_map, concat="horizontal")
+
+    # Linear Regression
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear.png".format(img_name)),
+                thresh_map=linear_map, concat="horizontal")
+
+    # Linear Regression + Downsample
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear_downsample.png".format(img_name)),
+                thresh_map=linear_map, concat="horizontal")
+
+    # MLP Regressor
+    model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp.png".format(img_name)),
+                thresh_map=mlp_map, concat="horizontal")
+
+    # MLP Regressor + Downsample
+    model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp_downsample.png".format(img_name)),
+                thresh_map=mlp_map, concat="horizontal")
 
 
 if __name__ == "__main__":
