@@ -1,9 +1,30 @@
 
 import cv2
+import time
+import logging
 import numpy as np
 from abc import abstractmethod
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.pipeline import Pipeline
+
+
+def _timeit(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        res = func(*args, **kwargs)
+        end = time.time()
+
+        func_name = "{}.{}".format(
+            args[0].__name__,
+            func.__name__
+        )
+        logging.info("{} time: {:.5f} s".format(func_name, end - start))
+        for k, v in kwargs.items():
+            logging.info("{} kwargs: {}: {}".format(func_name, k, v))
+        logging.info("")
+        return res
+    return wrapper
 
 
 class _BaseThresholding:
@@ -28,6 +49,7 @@ class _BaseThresholding:
         raise NotImplementedError
 
     @classmethod
+    @_timeit
     def binarize(cls, img, return_threshold=True, **kwargs):
         """
         To binarize a grayscale image
@@ -112,9 +134,28 @@ class RegressionThresholding(_BaseThresholding):
     """
     Thresholding using regression models
     """
+    @classmethod
+    def _fit(cls, data, rgr_model, P, C):
+        P = int(P)
+
+        y = data[:, 2]
+        y_mean, y_std = np.mean(y), np.std(y)
+        y = (y - y_mean) / y_std
+
+        X_preprocess = [("scale", StandardScaler())]
+        if P > 1:
+            X_preprocess.append(("poly", PolynomialFeatures(P)))
+        X_preprocess = Pipeline(X_preprocess)
+        X = X_preprocess.fit_transform(data[:, :-1])
+
+        rgr_model.fit(X, y)
+        pred = rgr_model.predict(X) - C
+        inv_pred = (pred * y_std) + y_mean
+        threshold = np.clip(inv_pred, 0, 255)
+        return threshold
 
     @classmethod
-    def threshold(cls, img, rgr_model=LinearRegression(), C=0, downsample=None, **kwargs):
+    def threshold(cls, img, rgr_model=LinearRegression(), P=1, C=0, downsample=None, **kwargs):
         if downsample is None or downsample <= 1:
             _height, _width = img.shape[0], img.shape[1]
             _img = img
@@ -126,15 +167,8 @@ class RegressionThresholding(_BaseThresholding):
         x = np.repeat(np.expand_dims(np.arange(_width), axis=0), _height, axis=0)
         y = np.repeat(np.expand_dims(np.arange(_height), axis=1), _width, axis=1)
         data = np.stack([x, y, _img], axis=2).reshape((-1, 3))
-        s = StandardScaler()
-        data = s.fit_transform(data)
-        X = data[:, [0, 1]]
-        y = data[:, 2]
 
-        rgr_model.fit(X, y)
-        pred = rgr_model.predict(X) - C
-        inv_pred = s.inverse_transform(np.stack([X[:, 0], X[:, 1], pred], axis=1))
-        threshold = np.clip(inv_pred[:, 2], 0, 255)
+        threshold = cls._fit(data, rgr_model, P, C)
         threshold = threshold.reshape(_img.shape).astype(np.uint8)
 
         if downsample is None or downsample <= 1:
