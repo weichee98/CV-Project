@@ -7,7 +7,8 @@ import pytesseract
 from Levenshtein import ratio
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
-from otsu import OTSU, AdaptiveMeanThresholding, RegressionThresholding
+
+from thresholding import OTSU, AdaptiveMeanThresholding, RegressionThresholding
 from utils import read_image, save_image
 
 
