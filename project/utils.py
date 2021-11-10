@@ -7,7 +7,7 @@ def read_image(path):
 
 
 def save_image(img, path):
-    dirname = os.path.dirname(path)
+    dirname = os.path.dirname(os.path.abspath(path))
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     cv2.imwrite(path, img)

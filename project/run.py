@@ -94,28 +94,28 @@ def sample01(data_dir, output_dir):
 
     # Linear Regression
     model = LinearRegression()
-    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=None)
     text, dist = ocr(linear, ref)
     plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear.png".format(img_name)),
                 thresh_map=linear_map, concat="vertical")
 
     # Linear Regression + Downsample
     model = LinearRegression()
-    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=2)
     text, dist = ocr(linear, ref)
     plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear_downsample.png".format(img_name)),
                 thresh_map=linear_map, concat="vertical")
 
     # MLP Regressor
     model = MLPRegressor(hidden_layer_sizes=(5, 5), max_iter=10, random_state=0, verbose=True)
-    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=None)
     text, dist = ocr(mlp, ref)
     plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp.png".format(img_name)),
                 thresh_map=mlp_map, concat="vertical")
 
     # MLP Regressor + Downsample
     model = MLPRegressor(hidden_layer_sizes=(5, 5), max_iter=10, random_state=0, verbose=True)
-    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=2)
     text, dist = ocr(mlp, ref)
     plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp_downsample.png".format(img_name)),
                 thresh_map=mlp_map, concat="vertical")
@@ -124,6 +124,68 @@ def sample01(data_dir, output_dir):
 def sample02(data_dir, output_dir):
     img_name = "sample02"
     file = "{}.png".format(img_name)
+    img_path = os.path.join(data_dir, file)
+    img = read_image(img_path)
+
+    with open(os.path.join(data_dir, '{}.txt'.format(img_name)), 'r') as f:
+        ref = f.read()
+
+    # Original Image
+    text, dist = ocr(img, ref)
+    plot_sample(img, text, dist, os.path.join(output_dir, "{}_none.png".format(img_name)), concat="horizontal")
+
+    # OTSU
+    otsu, otsu_map = OTSU.binarize(img)
+    text, dist = ocr(otsu, ref)
+    plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
+                thresh_map=otsu_map, concat="horizontal")
+
+    # Adaptive Mean Thresholding
+    mean, mean_map = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=1)
+    mean = cv2.medianBlur(mean, 3)
+    text, dist = ocr(mean, ref)
+    plot_sample(mean, text, dist, os.path.join(output_dir, "{}_mean.png".format(img_name)),
+                thresh_map=mean_map, concat="horizontal")
+
+    # Gaussian Blurring + Adaptive Mean Thresholding
+    gauss = cv2.GaussianBlur(img, (5, 5), sigmaX=1., sigmaY=1.)
+    gauss, gauss_map = AdaptiveMeanThresholding.binarize(gauss, kernel_size=3, C=1)
+    text, dist = ocr(gauss, ref)
+    plot_sample(gauss, text, dist, os.path.join(output_dir, "{}_gauss.png".format(img_name)),
+                thresh_map=gauss_map, concat="horizontal")
+
+    # Linear Regression
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.15, downsample=None)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear.png".format(img_name)),
+                thresh_map=linear_map, concat="horizontal")
+
+    # Linear Regression + Downsample
+    model = LinearRegression()
+    linear, linear_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.15, downsample=2)
+    text, dist = ocr(linear, ref)
+    plot_sample(linear, text, dist, os.path.join(output_dir, "{}_linear_downsample.png".format(img_name)),
+                thresh_map=linear_map, concat="horizontal")
+
+    # MLP Regressor
+    model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.15, downsample=None)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp.png".format(img_name)),
+                thresh_map=mlp_map, concat="horizontal")
+
+    # MLP Regressor + Downsample
+    model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.15, downsample=2)
+    text, dist = ocr(mlp, ref)
+    plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp_downsample.png".format(img_name)),
+                thresh_map=mlp_map, concat="horizontal")
+
+
+def sample03(data_dir, output_dir):
+    img_name = "sample03"
+    file = "{}.jpg".format(img_name)
     img_path = os.path.join(data_dir, file)
     img = read_image(img_path)
 
@@ -170,14 +232,14 @@ def sample02(data_dir, output_dir):
 
     # MLP Regressor
     model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
-    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=None)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=None)
     text, dist = ocr(mlp, ref)
     plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp.png".format(img_name)),
                 thresh_map=mlp_map, concat="horizontal")
 
     # MLP Regressor + Downsample
     model = MLPRegressor(hidden_layer_sizes=(10, 10), max_iter=10, random_state=0, verbose=True)
-    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.1, downsample=2)
+    mlp, mlp_map = RegressionThresholding.binarize(img, rgr_model=model, C=0.2, downsample=2)
     text, dist = ocr(mlp, ref)
     plot_sample(mlp, text, dist, os.path.join(output_dir, "{}_mlp_downsample.png".format(img_name)),
                 thresh_map=mlp_map, concat="horizontal")
@@ -196,3 +258,4 @@ if __name__ == "__main__":
 
     sample01(data_dir, output_dir)
     sample02(data_dir, output_dir)
+    sample03(data_dir, output_dir)
