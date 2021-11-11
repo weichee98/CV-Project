@@ -4,6 +4,10 @@ import time
 import logging
 import numpy as np
 from abc import abstractmethod
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.pipeline import Pipeline
@@ -78,6 +82,68 @@ class OTSU(_BaseThresholding):
     """
     Perform global OTSU thresholding
     """
+
+    @classmethod
+    def plot_histogram(cls, img, output_path=None, title=None):
+        histogram = cv2.calcHist(
+            images=[img],
+            channels=[0],
+            mask=None,
+            histSize=[256],
+            ranges=[0, 256],
+        )
+
+        num_pixels = img.size
+        probabilities = histogram.flatten() / num_pixels
+        gray_levels = np.arange(len(probabilities))
+        mean = gray_levels * probabilities
+
+        intra_class_variance = []
+        variance_thresholds = []
+        best_threshold = -1
+        min_variance = float('inf')
+
+        for t in range(1, len(histogram)):
+            lower_probability = np.sum(probabilities[:t])
+            upper_probability = np.sum(probabilities[t:])
+            if lower_probability == 0 or upper_probability == 0:
+                continue
+
+            lower_mean = np.sum(mean[:t]) / lower_probability
+            upper_mean = np.sum(mean[t:]) / upper_probability
+
+            lower_variance = np.sum(
+                ((gray_levels[:t] - lower_mean) ** 2) * probabilities[:t]) / lower_probability
+            upper_variance = np.sum(
+                ((gray_levels[t:] - upper_mean) ** 2) * probabilities[t:]) / upper_probability
+
+            variance = lower_probability * lower_variance + upper_probability * upper_variance
+            intra_class_variance.append(variance)
+            variance_thresholds.append(t)
+            if variance < min_variance:
+                min_variance = variance
+                best_threshold = t
+
+        f, ax = plt.subplots(1, 1, figsize=(10, 5))
+        ax.hist(img.ravel(), bins=256, label="histogram", color="tab:blue", alpha=0.7)
+        ax.set_ylabel("histogram count")
+        ax.set_xlabel("pixel intensity / threshold (t)")
+
+        ax2 = ax.twinx()
+        ax2.plot(variance_thresholds, intra_class_variance, color="tab:orange", label="interclass variance")
+        ax2.axvline(best_threshold, color="red", linestyle="--")
+        plt.text(best_threshold - 5, np.mean(intra_class_variance), "best threshold", rotation=90)
+        ax2.set_ylabel("interclass variance at threshold (t)")
+
+        handles1, _ = ax.get_legend_handles_labels()
+        handles2, _ = ax2.get_legend_handles_labels()
+        ax.legend(handles=handles1 + handles2, loc="upper right", bbox_to_anchor=(1., -0.05))
+
+        plt.title(title)
+        plt.tight_layout()
+        if output_path is not None:
+            f.savefig(output_path)
+        return f
 
     @classmethod
     def threshold(cls, img, **kwargs):

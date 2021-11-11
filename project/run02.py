@@ -19,6 +19,7 @@ def otsu_adaptive(img, ref, img_name, output_dir, orientation):
     text, dist = ocr(otsu, ref)
     plot_sample(otsu, text, dist, os.path.join(output_dir, "{}_otsu.png".format(img_name)),
                 thresh_map=otsu_map, concat=orientation)
+    OTSU.plot_histogram(img, os.path.join(output_dir, "{}_otsu_hist.png".format(img_name)), img_name)
 
     # Adaptive Mean Thresholding
     mean, mean_map = AdaptiveMeanThresholding.binarize(img, kernel_size=3, C=1)
