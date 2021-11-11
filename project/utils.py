@@ -1,6 +1,7 @@
 import os
 import re
 import cv2
+import logging
 import pytesseract
 import numpy as np
 from Levenshtein import ratio
@@ -24,6 +25,9 @@ def ocr(img, ref_text=None):
         dist = None
     else:
         dist = ratio(ref_text, text)
+    logging.info(text)
+    logging.info("score: {:.5f}".format(dist))
+    logging.info("")
     return text, dist
 
 
